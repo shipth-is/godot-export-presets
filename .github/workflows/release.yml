@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -80,5 +81,5 @@ jobs:
         if: ${{ steps.version-check.outputs.skipped == 'false' && !env.ACT }}
         uses: JS-DevTools/npm-publish@v3
         with:
-          token: ${{ secrets.NPM_TOKEN }}
+          registry: https://registry.npmjs.org
 
