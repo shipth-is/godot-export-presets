@@ -446,6 +446,99 @@ function parse_array(stream: Stream): unknown[] {
   }
 }
 
+function parse_object_constructor(stream: Stream): Record<string, unknown> {
+  // Parse: Object(ClassName, "property": value, ...)
+  const token = get_token(stream);
+  
+  if (token.type !== "PARENTHESIS_OPEN") {
+    throw new ParseError("Expected '(' in Object constructor", token.line);
+  }
+
+  // Get the class name
+  const classNameToken = get_token(stream);
+  if (classNameToken.type !== "IDENTIFIER") {
+    throw new ParseError("Expected class name in Object constructor", classNameToken.line);
+  }
+  const className = classNameToken.value as string;
+
+  // Check if there are properties or if it's empty
+  // Skip whitespace
+  while (true) {
+    const peek = stream.peek_char();
+    if (is_whitespace(peek)) {
+      stream.get_char();
+      continue;
+    }
+    break;
+  }
+
+  // Check if next is closing paren (empty Object)
+  if (stream.peek_char() === ")") {
+    get_token(stream); // Consume closing paren
+    return { __class: className };
+  }
+
+  // Expect comma after class name
+  const commaToken = get_token(stream);
+  if (commaToken.type !== "COMMA") {
+    throw new ParseError("Expected ',' after object type", commaToken.line);
+  }
+
+  // Parse properties as key-value pairs
+  const obj: Record<string, unknown> = {
+    __class: className, // Store class name for reference
+  };
+  let needComma = false;
+
+  while (true) {
+    if (stream.is_eof()) {
+      throw new ParseError("Unexpected EOF while parsing Object()", stream.get_line());
+    }
+
+    // Skip whitespace
+    while (true) {
+      const peek = stream.peek_char();
+      if (is_whitespace(peek)) {
+        stream.get_char();
+        continue;
+      }
+      break;
+    }
+
+    // Check for closing parenthesis
+    if (stream.peek_char() === ")") {
+      get_token(stream); // Consume the closing paren
+      return obj;
+    }
+
+    if (needComma) {
+      const token = get_token(stream);
+      if (token.type !== "COMMA") {
+        throw new ParseError("Expected ')' or ','", token.line);
+      }
+      needComma = false;
+    }
+
+    // Parse property key (must be a string)
+    const keyToken = get_token(stream);
+    if (keyToken.type !== "STRING") {
+      throw new ParseError("Expected property name as string", keyToken.line);
+    }
+    const key = keyToken.value as string;
+
+    // Expect colon
+    const colonToken = get_token(stream);
+    if (colonToken.type !== "COLON") {
+      throw new ParseError("Expected ':' after property name", colonToken.line);
+    }
+
+    // Parse property value
+    const value = parse_value(stream);
+    obj[key] = value;
+    needComma = true;
+  }
+}
+
 function parse_value(stream: Stream): unknown {
   const token = get_token(stream);
 
@@ -466,7 +559,13 @@ function parse_value(stream: Stream): unknown {
     }
     case "IDENTIFIER": {
       const ident = token.value as string;
-      if (ident === "Color") {
+      if (ident === "true") {
+        return true;
+      } else if (ident === "false") {
+        return false;
+      } else if (ident === "null" || ident === "nil") {
+        return null;
+      } else if (ident === "Color") {
         const args = parse_construct_args(stream);
         if (args.length !== 4) {
           throw new ParseError("Expected 4 arguments for Color constructor", token.line);
@@ -482,6 +581,9 @@ function parse_value(stream: Stream): unknown {
         // Handle PackedStringArray constructor
         const args = parse_string_construct_args(stream);
         return args; // Return as a regular array of strings
+      } else if (ident === "Object") {
+        // Handle Object() constructor
+        return parse_object_constructor(stream);
       } else {
         throw new ParseError(`Unknown identifier: ${ident}`, token.line);
       }
