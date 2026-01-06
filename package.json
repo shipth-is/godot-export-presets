@@ -1,6 +1,6 @@
 {
   "name": "godot-export-presets",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Read and write Godot export_presets.cfg files",
   "type": "module",
   "main": "./dist/index.js",
@@ -48,4 +48,3 @@
     "vitest": "^1.0.0"
   }
 }
-
