@@ -219,6 +219,116 @@ move_left={
     });
   });
 
+  describe("Object() constructor parsing", () => {
+    test("should parse simple Object() with one property", () => {
+      const configFile = new ConfigFile();
+      const configContent = `[test]
+
+event=Object(InputEventKey,"device":0)
+`;
+
+      const error = configFile.parse(configContent);
+
+      expect(error).toBeUndefined();
+      const event = configFile.get_value("test", "event") as Record<string, unknown>;
+      expect(event.__class).toBe("InputEventKey");
+      expect(event.device).toBe(0);
+    });
+
+    test("should parse Object() with multiple properties", () => {
+      const configFile = new ConfigFile();
+      const configContent = `[test]
+
+event=Object(InputEventKey,"device":0,"window_id":0,"pressed":false)
+`;
+
+      const error = configFile.parse(configContent);
+
+      expect(error).toBeUndefined();
+      const event = configFile.get_value("test", "event") as Record<string, unknown>;
+      expect(event.__class).toBe("InputEventKey");
+      expect(event.device).toBe(0);
+      expect(event.window_id).toBe(0);
+      expect(event.pressed).toBe(false);
+    });
+
+    test("should parse Object() with various value types", () => {
+      const configFile = new ConfigFile();
+      const configContent = `[test]
+
+event=Object(InputEventKey,"device":0,"resource_name":"","pressed":false,"script":null)
+`;
+
+      const error = configFile.parse(configContent);
+
+      expect(error).toBeUndefined();
+      const event = configFile.get_value("test", "event") as Record<string, unknown>;
+      expect(event.__class).toBe("InputEventKey");
+      expect(event.device).toBe(0);
+      expect(event.resource_name).toBe("");
+      expect(event.pressed).toBe(false);
+      expect(event.script).toBe(null);
+    });
+
+    test("should parse Object() in an array", () => {
+      const configFile = new ConfigFile();
+      const configContent = `[input]
+
+move_left={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":0,"keycode":65), Object(InputEventKey,"device":0,"keycode":68)]
+}
+`;
+
+      const error = configFile.parse(configContent);
+
+      expect(error).toBeUndefined();
+      const moveLeft = configFile.get_value("input", "move_left") as Record<string, unknown>;
+      expect(moveLeft.deadzone).toBe(0.2);
+      expect(Array.isArray(moveLeft.events)).toBe(true);
+      const events = moveLeft.events as Array<Record<string, unknown>>;
+      expect(events).toHaveLength(2);
+      expect(events[0].__class).toBe("InputEventKey");
+      expect(events[0].device).toBe(0);
+      expect(events[0].keycode).toBe(65);
+      expect(events[1].__class).toBe("InputEventKey");
+      expect(events[1].keycode).toBe(68);
+    });
+
+    test("should parse empty Object() with no properties", () => {
+      const configFile = new ConfigFile();
+      const configContent = `[test]
+
+event=Object(InputEventKey)
+`;
+
+      const error = configFile.parse(configContent);
+
+      expect(error).toBeUndefined();
+      const event = configFile.get_value("test", "event") as Record<string, unknown>;
+      expect(event.__class).toBe("InputEventKey");
+      expect(Object.keys(event)).toHaveLength(1); // Only __class property
+    });
+
+    test("should parse Object() with complex nested values", () => {
+      const configFile = new ConfigFile();
+      const configContent = `[test]
+
+event=Object(InputEventKey,"device":0,"physical_keycode":4194319,"key_label":0,"unicode":0)
+`;
+
+      const error = configFile.parse(configContent);
+
+      expect(error).toBeUndefined();
+      const event = configFile.get_value("test", "event") as Record<string, unknown>;
+      expect(event.__class).toBe("InputEventKey");
+      expect(event.device).toBe(0);
+      expect(event.physical_keycode).toBe(4194319);
+      expect(event.key_label).toBe(0);
+      expect(event.unicode).toBe(0);
+    });
+  });
+
   describe("Full project.godot example", () => {
     test("should parse minimal project.godot structure", () => {
       const configFile = new ConfigFile();
@@ -355,23 +465,25 @@ window/stretch/mode="canvas_items"
 
 move_left={
 "deadzone": 0.2,
-"events": []
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":65,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194319,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":0,"button_index":14,"pressure":0.0,"pressed":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":0,"axis":0,"axis_value":-1.0,"script":null)
+]
 }
 move_right={
 "deadzone": 0.2,
-"events": []
-}
-move_up={
-"deadzone": 0.2,
-"events": []
-}
-move_down={
-"deadzone": 0.2,
-"events": []
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":68,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194321,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":0,"button_index":15,"pressure":0.0,"pressed":false,"script":null)
+, Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":0,"axis":0,"axis_value":1.0,"script":null)
+]
 }
 start_game={
 "deadzone": 0.2,
-"events": []
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194309,"key_label":0,"unicode":0,"echo":false,"script":null)
+, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":32,"key_label":0,"unicode":0,"echo":false,"script":null)
+]
 }
 
 [rendering]
@@ -391,10 +503,22 @@ renderer/rendering_method.mobile="gl_compatibility"
       const features = configFile.get_value("application", "config/features");
       expect(features).toEqual(["4.2"]);
       
-      // Verify dictionary parsing for input mappings
+      // Verify dictionary parsing for input mappings with Object() constructors
       const moveLeft = configFile.get_value("input", "move_left") as Record<string, unknown>;
       expect(moveLeft.deadzone).toBe(0.2);
       expect(Array.isArray(moveLeft.events)).toBe(true);
+      const moveLeftEvents = moveLeft.events as Array<Record<string, unknown>>;
+      expect(moveLeftEvents.length).toBe(4);
+      expect(moveLeftEvents[0].__class).toBe("InputEventKey");
+      expect(moveLeftEvents[0].physical_keycode).toBe(65);
+      expect(moveLeftEvents[2].__class).toBe("InputEventJoypadButton");
+      
+      const startGame = configFile.get_value("input", "start_game") as Record<string, unknown>;
+      expect(startGame.deadzone).toBe(0.2);
+      const startEvents = startGame.events as Array<Record<string, unknown>>;
+      expect(startEvents).toHaveLength(2);
+      expect(startEvents[0].__class).toBe("InputEventKey");
+      expect(startEvents[1].__class).toBe("InputEventKey");
       
       // Verify other values
       expect(configFile.get_value("application", "config/name")).toBe("Dodge the Creeps");
