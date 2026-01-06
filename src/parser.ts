@@ -19,7 +19,10 @@ type TokenType =
   | "BRACKET_CLOSE"
   | "PARENTHESIS_OPEN"
   | "PARENTHESIS_CLOSE"
+  | "CURLY_BRACKET_OPEN"
+  | "CURLY_BRACKET_CLOSE"
   | "EQUAL"
+  | "COLON"
   | "COMMA"
   | "SEMICOLON"
   | "HASH"
@@ -121,8 +124,14 @@ function get_token(stream: Stream): Token {
       return { type: "PARENTHESIS_OPEN", value: c, line };
     case ")":
       return { type: "PARENTHESIS_CLOSE", value: c, line };
+    case "{":
+      return { type: "CURLY_BRACKET_OPEN", value: c, line };
+    case "}":
+      return { type: "CURLY_BRACKET_CLOSE", value: c, line };
     case "=":
       return { type: "EQUAL", value: c, line };
+    case ":":
+      return { type: "COLON", value: c, line };
     case ",":
       return { type: "COMMA", value: c, line };
     case ";":
@@ -296,6 +305,147 @@ function parse_construct_args(stream: Stream): number[] {
   return args;
 }
 
+function parse_string_construct_args(stream: Stream): string[] {
+  const args: string[] = [];
+  let token = get_token(stream);
+
+  if (token.type !== "PARENTHESIS_OPEN") {
+    throw new ParseError("Expected '(' in constructor", token.line);
+  }
+
+  let first = true;
+  while (true) {
+    if (!first) {
+      token = get_token(stream);
+      if (token.type === "COMMA") {
+        // Continue
+      } else if (token.type === "PARENTHESIS_CLOSE") {
+        break;
+      } else {
+        throw new ParseError("Expected ',' or ')' in constructor", token.line);
+      }
+    }
+
+    token = get_token(stream);
+    if (first && token.type === "PARENTHESIS_CLOSE") {
+      break;
+    }
+
+    if (token.type === "STRING") {
+      args.push(token.value as string);
+    } else {
+      throw new ParseError("Expected string in constructor", token.line);
+    }
+    first = false;
+  }
+
+  return args;
+}
+
+function parse_dictionary(stream: Stream): Record<string, unknown> {
+  const dict: Record<string, unknown> = {};
+  let needComma = false;
+
+  while (true) {
+    if (stream.is_eof()) {
+      throw new ParseError("Unexpected EOF while parsing dictionary", stream.get_line());
+    }
+
+    // Skip whitespace and peek at next token
+    while (true) {
+      const peek = stream.peek_char();
+      if (is_whitespace(peek)) {
+        stream.get_char();
+        continue;
+      }
+      break;
+    }
+
+    // Check if next character is closing brace
+    if (stream.peek_char() === "}") {
+      // Consume the closing brace token
+      get_token(stream);
+      return dict;
+    }
+
+    if (needComma) {
+      const token = get_token(stream);
+      if (token.type !== "COMMA") {
+        throw new ParseError("Expected '}' or ','", token.line);
+      }
+      needComma = false;
+    }
+
+    // Parse key
+    const keyToken = get_token(stream);
+    let key: unknown;
+    if (keyToken.type === "STRING") {
+      key = keyToken.value;
+    } else if (keyToken.type === "NUMBER") {
+      key = keyToken.value;
+    } else if (keyToken.type === "BOOLEAN") {
+      key = keyToken.value;
+    } else if (keyToken.type === "IDENTIFIER") {
+      key = keyToken.value;
+    } else {
+      throw new ParseError("Expected dictionary key", keyToken.line);
+    }
+
+    // Expect colon after key
+    const colonToken = get_token(stream);
+    if (colonToken.type !== "COLON") {
+      throw new ParseError("Expected ':' after dictionary key", colonToken.line);
+    }
+
+    // Parse value
+    const value = parse_value(stream);
+    const keyStr = String(key);
+    dict[keyStr] = value;
+    needComma = true;
+  }
+}
+
+function parse_array(stream: Stream): unknown[] {
+  const arr: unknown[] = [];
+  let needComma = false;
+
+  while (true) {
+    if (stream.is_eof()) {
+      throw new ParseError("Unexpected EOF while parsing array", stream.get_line());
+    }
+
+    // Skip whitespace and peek at next token
+    while (true) {
+      const peek = stream.peek_char();
+      if (is_whitespace(peek)) {
+        stream.get_char();
+        continue;
+      }
+      break;
+    }
+
+    // Check if next character is closing bracket
+    if (stream.peek_char() === "]") {
+      // Consume the closing bracket token
+      get_token(stream);
+      return arr;
+    }
+
+    if (needComma) {
+      const token = get_token(stream);
+      if (token.type !== "COMMA") {
+        throw new ParseError("Expected ']' or ','", token.line);
+      }
+      needComma = false;
+    }
+
+    // Parse value
+    const value = parse_value(stream);
+    arr.push(value);
+    needComma = true;
+  }
+}
+
 function parse_value(stream: Stream): unknown {
   const token = get_token(stream);
 
@@ -306,6 +456,14 @@ function parse_value(stream: Stream): unknown {
       return token.value;
     case "BOOLEAN":
       return token.value;
+    case "BRACKET_OPEN": {
+      // Array literal
+      return parse_array(stream);
+    }
+    case "CURLY_BRACKET_OPEN": {
+      // Dictionary/object literal
+      return parse_dictionary(stream);
+    }
     case "IDENTIFIER": {
       const ident = token.value as string;
       if (ident === "Color") {
@@ -320,6 +478,10 @@ function parse_value(stream: Stream): unknown {
           throw new ParseError("Expected 2 arguments for Vector2 constructor", token.line);
         }
         return { x: args[0], y: args[1] };
+      } else if (ident === "PackedStringArray" || ident === "PoolStringArray" || ident === "StringArray") {
+        // Handle PackedStringArray constructor
+        const args = parse_string_construct_args(stream);
+        return args; // Return as a regular array of strings
       } else {
         throw new ParseError(`Unknown identifier: ${ident}`, token.line);
       }
