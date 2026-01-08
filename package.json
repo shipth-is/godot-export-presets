@@ -38,8 +38,12 @@
     "presets",
     "config"
   ],
-  "author": "",
+  "author": "Hello Invent Ltd",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipth-is/godot-export-presets.git"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@vitest/coverage-v8": "^1.0.0",
