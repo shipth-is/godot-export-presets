@@ -51,7 +51,7 @@ architectures/armeabi-v7a=false
     expect(result.presets[0].dedicated_server).toBe(false);
     expect(result.presets[0].options).toBeDefined();
     expect(result.presets[0].options?.["package/unique_name"]).toBe(
-      "com.example.$genname"
+      "com.example.$genname",
     );
     expect(result.presets[0].options?.["architectures/arm64-v8a"]).toBe(true);
   });
@@ -86,10 +86,10 @@ application/identifier="com.example.ios"
     expect(result.presets[1].name).toBe("iOS");
     expect(result.presets[1].platform).toBe("iOS");
     expect(result.presets[0].options?.["package/unique_name"]).toBe(
-      "com.example"
+      "com.example",
     );
     expect(result.presets[1].options?.["application/identifier"]).toBe(
-      "com.example.ios"
+      "com.example.ios",
     );
   });
 
@@ -176,7 +176,7 @@ describe("Phase 2: File Writing", () => {
     expect(parsed.presets).toHaveLength(1);
     expect(parsed.presets[0].name).toBe("Android");
     expect(parsed.presets[0].options?.["package/unique_name"]).toBe(
-      "com.example"
+      "com.example",
     );
   });
 
@@ -283,9 +283,7 @@ describe("Phase 3: Preset Operations", () => {
 
   test("Set preset (update)", () => {
     const presets: ExportPresetsFile = {
-      presets: [
-        { name: "Android", platform: "Android", runnable: true },
-      ],
+      presets: [{ name: "Android", platform: "Android", runnable: true }],
     };
 
     const updatedPreset: ExportPreset = {
@@ -418,36 +416,43 @@ package/unique_name="com.example"
       ],
     };
 
-    const filePath = join(tmpdir(), "test_export_presets_readme.cfg");
+    const uniqueSuffix = `${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const filePath = join(
+      tmpdir(),
+      `test_export_presets_readme_${uniqueSuffix}.cfg`,
+    );
 
-    // Save initial file
-    await saveExportPresets(filePath, initialPresets);
+    try {
+      // Save initial file
+      await saveExportPresets(filePath, initialPresets);
 
-    // Load existing presets
-    const presets = await loadExportPresets(filePath);
-    expect(presets.presets).toHaveLength(1);
-    expect(presets.presets[0].export_path).toBe(""); // Verify it's not game.apk
+      // Load existing presets
+      const presets = await loadExportPresets(filePath);
+      expect(presets.presets).toHaveLength(1);
+      expect(presets.presets[0].export_path).toBe(""); // Verify it's not game.apk
 
-    // Find preset by platform name (case-insensitive)
-    const androidPreset = findPreset(presets, { platform: "android" });
-    expect(androidPreset).toBeDefined();
-    
-    if (androidPreset) {
-      // Edit the export path
-      androidPreset.export_path = "game.apk";
+      // Find preset by platform name (case-insensitive)
+      const androidPreset = findPreset(presets, { platform: "android" });
+      expect(androidPreset).toBeDefined();
+
+      if (androidPreset) {
+        // Edit the export path
+        androidPreset.export_path = "game.apk";
+      }
+
+      // Save the file
+      await saveExportPresets(filePath, presets);
+
+      // Reload the file
+      const reloaded = await loadExportPresets(filePath);
+
+      // Check the export path
+      expect(reloaded.presets).toHaveLength(1);
+      expect(reloaded.presets[0].export_path).toBe("game.apk");
+      expect(reloaded.presets[0].name).toBe("Android");
+      expect(reloaded.presets[0].platform).toBe("Android");
+    } finally {
+      await unlink(filePath).catch(() => {});
     }
-
-    // Save the file
-    await saveExportPresets(filePath, presets);
-
-    // Reload the file
-    const reloaded = await loadExportPresets(filePath);
-    
-    // Check the export path
-    expect(reloaded.presets).toHaveLength(1);
-    expect(reloaded.presets[0].export_path).toBe("game.apk");
-    expect(reloaded.presets[0].name).toBe("Android");
-    expect(reloaded.presets[0].platform).toBe("Android");
   });
 });
-
