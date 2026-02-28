@@ -108,6 +108,53 @@ runnable=true
   });
 });
 
+describe("Options keys with @ (iOS storyboard)", () => {
+  const IOS_PRESET_WITH_AT_KEYS = `[preset.0]
+
+name="iOS"
+platform="iOS"
+runnable=true
+
+[preset.0.options]
+
+application/min_ios_version="14.0"
+storyboard/image_scale_mode=0
+storyboard/custom_image@2x=""
+storyboard/custom_image@3x=""
+storyboard/use_custom_bg_color=false
+`;
+
+  test("Parse iOS preset options with @ in keys (storyboard/custom_image@2x, @3x)", () => {
+    const result = parseExportPresets(IOS_PRESET_WITH_AT_KEYS);
+
+    expect(result.presets).toHaveLength(1);
+    expect(result.presets[0].name).toBe("iOS");
+    expect(result.presets[0].platform).toBe("iOS");
+    expect(result.presets[0].options).toBeDefined();
+
+    const options = result.presets[0].options!;
+    expect(options["application/min_ios_version"]).toBe("14.0");
+    expect(options["storyboard/image_scale_mode"]).toBe(0);
+    expect(options["storyboard/custom_image@2x"]).toBe("");
+    expect(options["storyboard/custom_image@3x"]).toBe("");
+    expect(options["storyboard/use_custom_bg_color"]).toBe(false);
+  });
+
+  test("Round-trip preserves options with @ in keys", () => {
+    const parsed = parseExportPresets(IOS_PRESET_WITH_AT_KEYS);
+    const serialized = serializeExportPresets(parsed);
+    const roundTripped = parseExportPresets(serialized);
+
+    expect(roundTripped.presets).toHaveLength(1);
+    const options = roundTripped.presets[0].options!;
+    expect(options["storyboard/custom_image@2x"]).toBe("");
+    expect(options["storyboard/custom_image@3x"]).toBe("");
+    expect(options["application/min_ios_version"]).toBe("14.0");
+    expect(options["storyboard/image_scale_mode"]).toBe(0);
+    expect(options["storyboard/use_custom_bg_color"]).toBe(false);
+  });
+});
+
 describe("Phase 2: File Writing", () => {
   test("Write single preset", async () => {
     const preset: ExportPreset = {
@@ -355,6 +402,52 @@ package/unique_name="com.example"
 
     // Cleanup
     await unlink(filePath);
+  });
+
+  test("README example: Load, edit export path, save, and reload", async () => {
+    // Create initial test file with export_path NOT set to game.apk
+    const initialPresets: ExportPresetsFile = {
+      presets: [
+        {
+          name: "Android",
+          platform: "Android",
+          runnable: true,
+          export_path: "", // NOT set to game.apk
+          options: { "package/unique_name": "com.example" },
+        },
+      ],
+    };
+
+    const filePath = join(tmpdir(), "test_export_presets_readme.cfg");
+
+    // Save initial file
+    await saveExportPresets(filePath, initialPresets);
+
+    // Load existing presets
+    const presets = await loadExportPresets(filePath);
+    expect(presets.presets).toHaveLength(1);
+    expect(presets.presets[0].export_path).toBe(""); // Verify it's not game.apk
+
+    // Find preset by platform name (case-insensitive)
+    const androidPreset = findPreset(presets, { platform: "android" });
+    expect(androidPreset).toBeDefined();
+    
+    if (androidPreset) {
+      // Edit the export path
+      androidPreset.export_path = "game.apk";
+    }
+
+    // Save the file
+    await saveExportPresets(filePath, presets);
+
+    // Reload the file
+    const reloaded = await loadExportPresets(filePath);
+    
+    // Check the export path
+    expect(reloaded.presets).toHaveLength(1);
+    expect(reloaded.presets[0].export_path).toBe("game.apk");
+    expect(reloaded.presets[0].name).toBe("Android");
+    expect(reloaded.presets[0].platform).toBe("Android");
   });
 });
 
