@@ -94,7 +94,7 @@ function is_alnum(c: string): boolean {
 }
 
 function is_identifier_char(c: string): boolean {
-  return is_alnum(c) || c === "/" || c === "." || c === "_" || c === "-";
+  return is_alnum(c) || c === "/" || c === "." || c === "_" || c === "-" || c === "@";
 }
 
 function get_token(stream: Stream): Token {
