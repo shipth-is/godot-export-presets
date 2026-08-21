@@ -125,7 +125,11 @@ function serialize_value(value: unknown): string {
       return `Object(${[className, ...properties].join(", ")})`;
     }
 
-    // Dictionary, written the way Godot writes it
+    // Dictionary, written the way Godot writes it. Godot skips the line
+    // breaks for an empty one.
+    if (entries.length === 0) {
+      return "{}";
+    }
     const pairs = entries.map(
       ([key, val]) => `${serialize_value(key)}: ${serialize_value(val)}`
     );

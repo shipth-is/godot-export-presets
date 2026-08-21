@@ -67,6 +67,12 @@ describe("round-trip of Godot values", () => {
     expect(roundTrip('{\n"a": 1,\n"b": "two"\n}')).toBe('{\n"a": 1,\n"b": "two"\n}');
   });
 
+  test("an empty dictionary keeps Godot's short form", () => {
+    // Godot writes {} rather than a dictionary with a blank line in it
+    expect(roundTrip("{}")).toBe("{}");
+    expect(serializeOption({})).toBe("{}");
+  });
+
   test("an untagged array is written as a Godot array", () => {
     expect(roundTrip("[1, 2]")).toBe("[1, 2]");
   });
@@ -163,7 +169,7 @@ describe("base preset defaults", () => {
   test("iOS v4 writes the localized dictionaries as dictionaries", () => {
     const preset = getBasePreset("iOS", 4);
     const text = serializeExportPresets({ presets: [preset] });
-    expect(text).toContain("privacy/camera_usage_description_localized={");
+    expect(text).toContain("privacy/camera_usage_description_localized={}\n");
     expect(text).not.toContain('_localized="');
   });
 
@@ -177,5 +183,42 @@ describe("base preset defaults", () => {
       presets: [getBasePreset(platform, version)],
     });
     expect(serializeExportPresets(parseExportPresets(text))).toBe(text);
+  });
+});
+
+describe("infinity and not-a-number", () => {
+  test.each([
+    ["inf", Infinity],
+    ["-inf", -Infinity],
+    // Godot still reads the older spelling it used to write
+    ["inf_neg", -Infinity],
+    ["Infinity", Infinity],
+    ["-Infinity", -Infinity],
+  ] as const)("reads %s", (literal, expected) => {
+    expect(parseOption(literal)).toBe(expected);
+  });
+
+  test("reads nan", () => {
+    expect(parseOption("nan")).toBeNaN();
+  });
+
+  test.each([
+    [Infinity, "inf"],
+    [-Infinity, "-inf"],
+    [NaN, "nan"],
+  ] as const)("writes %s as %s", (value, expected) => {
+    expect(serializeOption(value)).toBe(expected);
+  });
+
+  test.each(["inf", "-inf", "nan"])("%s survives a read/write cycle", (literal) => {
+    expect(roundTrip(literal)).toBe(literal);
+  });
+
+  test("the older inf_neg spelling is normalised to -inf", () => {
+    expect(roundTrip("inf_neg")).toBe("-inf");
+  });
+
+  test("a leading minus does not make any word a value", () => {
+    expect(() => parseOption("-garbage")).toThrow();
   });
 });

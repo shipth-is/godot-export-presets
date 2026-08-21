@@ -238,8 +238,9 @@ function get_token(stream: Stream): Token {
           throw new ParseError(`Invalid number: ${numStr}`, line);
         }
         return { type: "NUMBER", value: num, line };
-      } else if (is_alpha(c) || c === "/") {
-        // Identifier or boolean
+      } else if (is_alpha(c) || c === "/" || (c === "-" && is_alpha(peek))) {
+        // Identifier or boolean. A leading '-' belongs to the name for the
+        // negative infinity literal, which Godot writes as -inf.
         let ident = c;
         while (true) {
           const peek = stream.peek_char();
@@ -589,6 +590,13 @@ function parse_value_from_token(token: Token, stream: Stream): unknown {
         return { x: args[0], y: args[1] };
       } else if (ident === "inf" || ident === "Infinity") {
         return Infinity;
+      } else if (
+        ident === "-inf" ||
+        ident === "-Infinity" ||
+        ident === "inf_neg"
+      ) {
+        // Godot writes -inf. inf_neg is the older spelling it still reads.
+        return -Infinity;
       } else if (ident === "nan" || ident === "NaN") {
         return NaN;
       } else if (isGodotArrayType(ident)) {
