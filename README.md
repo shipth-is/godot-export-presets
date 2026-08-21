@@ -92,6 +92,35 @@ Main functions:
 
 For full TypeScript types and API details, see the type definitions in `dist/index.d.ts`.
 
+## Value types
+
+Values keep the Godot type they were written as, so a file survives a read and
+write cycle unchanged:
+
+```typescript
+const presets = await loadExportPresets('./export_presets.cfg');
+const preset = findPreset(presets, { platform: 'Android' })!;
+
+// PackedStringArray("android.permission.VIBRATE") reads as an array
+const permissions = preset.options!['permissions/custom_permissions'];
+console.log(permissions[0]); // "android.permission.VIBRATE"
+
+// and is written back as a PackedStringArray, not as a string
+await saveExportPresets('./export_presets.cfg', presets);
+```
+
+Packed and Pool arrays are real arrays with a `godotType` property that records
+the type name. The property is not enumerable, so `JSON.stringify`, `toEqual`
+and spreading all behave as they do for a plain array. Build one with
+`makeGodotArray('PackedStringArray', ['a'])`.
+
+Godot 3 spacing is kept as well - `PoolStringArray( "a" )` in, the same string
+out.
+
+Types with no special case - `Vector3`, `Rect2`, `NodePath` - are kept as a
+`GodotConstructor` holding the name and the arguments, and are written back
+unchanged. A constructor the library has never seen is therefore not an error.
+
 ## Implementation Notes
 
 This library is based on Godot's source code. The parsing logic follows Godot's `VariantParser` implementation, and the serialization follows `VariantWriter` and `String::property_name_encode`. The base presets are extracted from real Godot export configurations.

@@ -3,6 +3,7 @@
  * Serializes values back to config format matching Godot's output
  */
 
+import { GodotArray, GodotConstructor } from "./types.js";
 import type { Color, Vector2 } from "./types.js";
 
 function needs_quotes(str: string): boolean {
@@ -99,8 +100,52 @@ function serialize_value(value: unknown): string {
     return `Vector2(${vec.x}, ${vec.y})`;
   }
 
+  if (value instanceof GodotConstructor) {
+    return serialize_constructor(value.name, value.args);
+  }
+
+  if (Array.isArray(value)) {
+    const godotType = (value as GodotArray).godotType;
+    if (godotType) {
+      return serialize_constructor(godotType, value);
+    }
+    // An untagged array is a plain Godot Array
+    return `[${value.map(serialize_value).join(", ")}]`;
+  }
+
+  if (typeof value === "object" && value !== null) {
+    const entries = Object.entries(value as Record<string, unknown>);
+
+    // Object(ClassName, "property": value, ...)
+    const className = (value as Record<string, unknown>).__class;
+    if (typeof className === "string") {
+      const properties = entries
+        .filter(([key]) => key !== "__class")
+        .map(([key, val]) => `${serialize_value(key)}: ${serialize_value(val)}`);
+      return `Object(${[className, ...properties].join(", ")})`;
+    }
+
+    // Dictionary, written the way Godot writes it
+    const pairs = entries.map(
+      ([key, val]) => `${serialize_value(key)}: ${serialize_value(val)}`
+    );
+    return `{\n${pairs.join(",\n")}\n}`;
+  }
+
   // Fallback: try to stringify
   return String(value);
+}
+
+/**
+ * Write a constructor value. Godot 3 pads the arguments with spaces
+ * - PoolStringArray( "a" ) - and Godot 4 does not - PackedStringArray("a").
+ */
+function serialize_constructor(name: string, args: readonly unknown[]): string {
+  const serialized = args.map(serialize_value).join(", ");
+  if (name.startsWith("Pool") || name === "StringArray") {
+    return `${name}( ${serialized} )`;
+  }
+  return `${name}(${serialized})`;
 }
 
 export function serialize_config(

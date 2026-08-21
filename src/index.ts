@@ -5,6 +5,12 @@
  */
 
 export { ConfigFile } from "./config-file.js";
+export {
+  GodotArray,
+  GodotConstructor,
+  isGodotArrayType,
+  makeGodotArray,
+} from "./types.js";
 export type { Color, Vector2 } from "./types.js";
 
 // Export presets API
