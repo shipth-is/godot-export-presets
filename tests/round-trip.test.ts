@@ -3,6 +3,7 @@ import {
   ConfigFile,
   GodotArray,
   GodotConstructor,
+  getBasePreset,
   parseExportPresets,
   serializeExportPresets,
 } from "../src/index.js";
@@ -138,5 +139,43 @@ permissions/custom_permissions=PackedStringArray("android.permission.VIBRATE")
     const preset = parseExportPresets(cfg).presets[0];
     expect(preset.script_export_mode).toBe(2);
     expect(preset.options!["version/code"]).toBe(7);
+  });
+});
+
+describe("base preset defaults", () => {
+  const cases = [
+    ["Android", 3, "permissions/custom_permissions", "PoolStringArray(  )"],
+    ["Android", 4, "permissions/custom_permissions", "PackedStringArray()"],
+    ["iOS", 3, "privacy/tracking_domains", "PoolStringArray(  )"],
+    ["iOS", 3, "storyboard/custom_bg_color", "Color(0, 0, 0, 1)"],
+    ["iOS", 4, "storyboard/custom_bg_color", "Color(0, 0, 0, 1)"],
+  ] as const;
+
+  test.each(cases)(
+    "%s v%d writes %s as a Godot value, not a quoted string",
+    (platform, version, option, expected) => {
+      const preset = getBasePreset(platform, version);
+      const text = serializeExportPresets({ presets: [preset] });
+      expect(text).toContain(`${option}=${expected}\n`);
+    }
+  );
+
+  test("iOS v4 writes the localized dictionaries as dictionaries", () => {
+    const preset = getBasePreset("iOS", 4);
+    const text = serializeExportPresets({ presets: [preset] });
+    expect(text).toContain("privacy/camera_usage_description_localized={");
+    expect(text).not.toContain('_localized="');
+  });
+
+  test.each([
+    ["Android", 3],
+    ["Android", 4],
+    ["iOS", 3],
+    ["iOS", 4],
+  ] as const)("%s v%d survives a write, read and write", (platform, version) => {
+    const text = serializeExportPresets({
+      presets: [getBasePreset(platform, version)],
+    });
+    expect(serializeExportPresets(parseExportPresets(text))).toBe(text);
   });
 });
