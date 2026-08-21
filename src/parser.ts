@@ -3,6 +3,12 @@
  * Based on Godot's VariantParser implementation
  */
 
+import {
+  GodotConstructor,
+  isGodotArrayType,
+  makeGodotArray,
+} from "./types.js";
+
 export class ParseError extends Error {
   constructor(message: string, public line: number) {
     super(`Parse error at line ${line}: ${message}`);
@@ -232,8 +238,9 @@ function get_token(stream: Stream): Token {
           throw new ParseError(`Invalid number: ${numStr}`, line);
         }
         return { type: "NUMBER", value: num, line };
-      } else if (is_alpha(c) || c === "/") {
-        // Identifier or boolean
+      } else if (is_alpha(c) || c === "/" || (c === "-" && is_alpha(peek))) {
+        // Identifier or boolean. A leading '-' belongs to the name for the
+        // negative infinity literal, which Godot writes as -inf.
         let ident = c;
         while (true) {
           const peek = stream.peek_char();
@@ -305,42 +312,6 @@ function parse_construct_args(stream: Stream): number[] {
   return args;
 }
 
-function parse_string_construct_args(stream: Stream): string[] {
-  const args: string[] = [];
-  let token = get_token(stream);
-
-  if (token.type !== "PARENTHESIS_OPEN") {
-    throw new ParseError("Expected '(' in constructor", token.line);
-  }
-
-  let first = true;
-  while (true) {
-    if (!first) {
-      token = get_token(stream);
-      if (token.type === "COMMA") {
-        // Continue
-      } else if (token.type === "PARENTHESIS_CLOSE") {
-        break;
-      } else {
-        throw new ParseError("Expected ',' or ')' in constructor", token.line);
-      }
-    }
-
-    token = get_token(stream);
-    if (first && token.type === "PARENTHESIS_CLOSE") {
-      break;
-    }
-
-    if (token.type === "STRING") {
-      args.push(token.value as string);
-    } else {
-      throw new ParseError("Expected string in constructor", token.line);
-    }
-    first = false;
-  }
-
-  return args;
-}
 
 function parse_dictionary(stream: Stream): Record<string, unknown> {
   const dict: Record<string, unknown> = {};
@@ -539,9 +510,49 @@ function parse_object_constructor(stream: Stream): Record<string, unknown> {
   }
 }
 
-function parse_value(stream: Stream): unknown {
-  const token = get_token(stream);
+/**
+ * Parse the arguments of any constructor, allowing any value type.
+ * Used for Godot types we have no special case for.
+ */
+function parse_any_construct_args(stream: Stream): unknown[] {
+  const open = get_token(stream);
+  if (open.type !== "PARENTHESIS_OPEN") {
+    throw new ParseError("Expected '(' in constructor", open.line);
+  }
 
+  const args: unknown[] = [];
+  let first = true;
+
+  while (true) {
+    let token = get_token(stream);
+
+    if (token.type === "PARENTHESIS_CLOSE") {
+      break;
+    }
+
+    if (!first) {
+      if (token.type !== "COMMA") {
+        throw new ParseError("Expected ',' or ')' in constructor", token.line);
+      }
+      // A trailing comma before the closing paren is allowed
+      token = get_token(stream);
+      if (token.type === "PARENTHESIS_CLOSE") {
+        break;
+      }
+    }
+
+    args.push(parse_value_from_token(token, stream));
+    first = false;
+  }
+
+  return args;
+}
+
+function parse_value(stream: Stream): unknown {
+  return parse_value_from_token(get_token(stream), stream);
+}
+
+function parse_value_from_token(token: Token, stream: Stream): unknown {
   switch (token.type) {
     case "STRING":
       return token.value;
@@ -577,15 +588,29 @@ function parse_value(stream: Stream): unknown {
           throw new ParseError("Expected 2 arguments for Vector2 constructor", token.line);
         }
         return { x: args[0], y: args[1] };
-      } else if (ident === "PackedStringArray" || ident === "PoolStringArray" || ident === "StringArray") {
-        // Handle PackedStringArray constructor
-        const args = parse_string_construct_args(stream);
-        return args; // Return as a regular array of strings
+      } else if (ident === "inf" || ident === "Infinity") {
+        return Infinity;
+      } else if (
+        ident === "-inf" ||
+        ident === "-Infinity" ||
+        ident === "inf_neg"
+      ) {
+        // Godot writes -inf. inf_neg is the older spelling it still reads.
+        return -Infinity;
+      } else if (ident === "nan" || ident === "NaN") {
+        return NaN;
+      } else if (isGodotArrayType(ident)) {
+        // PackedStringArray, PoolIntArray, PackedVector2Array and friends.
+        // Tagged so it is written back as the same type.
+        return makeGodotArray(ident, parse_any_construct_args(stream));
       } else if (ident === "Object") {
         // Handle Object() constructor
         return parse_object_constructor(stream);
       } else {
-        throw new ParseError(`Unknown identifier: ${ident}`, token.line);
+        // Any other constructor - Vector3, Rect2, NodePath. Keep the name and
+        // arguments so the value survives a read/write cycle. A bare
+        // identifier is still an error, as it is in Godot.
+        return new GodotConstructor(ident, parse_any_construct_args(stream));
       }
     }
     default:

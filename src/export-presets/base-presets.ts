@@ -2,6 +2,7 @@
  * Base preset definitions for common platforms and Godot versions
  */
 
+import { makeGodotArray } from "../types.js";
 import type { ExportPreset } from "./types.js";
 
 export type GodotMajorVersion = 3 | 4;
@@ -112,7 +113,7 @@ export function getBasePreset_Android_v3(): ExportPreset {
       "apk_expansion/enable": false,
       "apk_expansion/salt": "",
       "apk_expansion/public_key": "",
-      "permissions/custom_permissions": "PoolStringArray(  )",
+      "permissions/custom_permissions": makeGodotArray<string>("PoolStringArray", []),
       "permissions/access_checkin_properties": false,
       "permissions/access_coarse_location": false,
       "permissions/access_fine_location": false,
@@ -315,7 +316,7 @@ export function getBasePreset_Android_v4(): ExportPreset {
       "apk_expansion/enable": false,
       "apk_expansion/SALT": "",
       "apk_expansion/public_key": "",
-      "permissions/custom_permissions": "PackedStringArray()",
+      "permissions/custom_permissions": makeGodotArray<string>("PackedStringArray", []),
       "permissions/access_checkin_properties": false,
       "permissions/access_coarse_location": false,
       "permissions/access_fine_location": false,
@@ -505,7 +506,7 @@ export function getBasePreset_iOS_v3(): ExportPreset {
       "privacy/active_keyboard_access_reasons": 0,
       "privacy/user_defaults_access_reasons": 0,
       "privacy/tracking_enabled": false,
-      "privacy/tracking_domains": "PoolStringArray(  )",
+      "privacy/tracking_domains": makeGodotArray<string>("PoolStringArray", []),
       "privacy/collected_data/name/collected": false,
       "privacy/collected_data/name/linked_to_user": false,
       "privacy/collected_data/name/used_for_tracking": false,
@@ -658,7 +659,7 @@ export function getBasePreset_iOS_v3(): ExportPreset {
       "storyboard/custom_image@2x": "",
       "storyboard/custom_image@3x": "",
       "storyboard/use_custom_bg_color": false,
-      "storyboard/custom_bg_color": "Color( 0, 0, 0, 1 )",
+      "storyboard/custom_bg_color": { r: 0, g: 0, b: 0, a: 1 },
     },
   };
 }
@@ -694,11 +695,11 @@ export function getBasePreset_iOS_v4(): ExportPreset {
       "user_data/accessible_from_files_app": false,
       "user_data/accessible_from_itunes_sharing": false,
       "privacy/camera_usage_description": "",
-      "privacy/camera_usage_description_localized": "{}",
+      "privacy/camera_usage_description_localized": {},
       "privacy/microphone_usage_description": "",
-      "privacy/microphone_usage_description_localized": "{}",
+      "privacy/microphone_usage_description_localized": {},
       "privacy/photolibrary_usage_description": "",
-      "privacy/photolibrary_usage_description_localized": "{}",
+      "privacy/photolibrary_usage_description_localized": {},
       "icons/app_store_1024x1024": "",
       "icons/ipad_152x152": "",
       "icons/ipad_167x167": "",
@@ -716,7 +717,7 @@ export function getBasePreset_iOS_v4(): ExportPreset {
       "storyboard/custom_image@2x": "",
       "storyboard/custom_image@3x": "",
       "storyboard/use_custom_bg_color": false,
-      "storyboard/custom_bg_color": "Color(0, 0, 0, 1)",
+      "storyboard/custom_bg_color": { r: 0, g: 0, b: 0, a: 1 },
       "landscape_launch_screens/iphone_2436x1125": "",
       "landscape_launch_screens/iphone_2208x1242": "",
       "landscape_launch_screens/ipad_1024x768": "",
